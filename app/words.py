@@ -266,6 +266,46 @@ def load(con, wid: int, with_dict: bool = False):
     return out
 
 
+_FORMS: dict[str, set[str]] = {}
+
+
+def _forms(word: str) -> set[str]:
+    """這個字和它的變化形（小寫），比對文章用；查過就記住。"""
+    w = word.lower()
+    if w not in _FORMS:
+        _FORMS[w] = {w} if " " in w else {w, *(f.lower() for f in dictionary.forms_of(word))}
+    return _FORMS[w]
+
+
+def article_sources(con) -> dict[int, list[str]]:
+    """每個字屬於哪幾篇文章：在那篇加入的（不含只記在那篇的灰色字），或在文章內文裡出現過。"""
+    active = con.execute("SELECT id, word FROM words WHERE status='active'").fetchall()
+    by_word = {r["word"].lower(): r["id"] for r in active}
+    out: dict[int, list[str]] = defaultdict(list)
+    for a in con.execute("SELECT id, title, body FROM articles"):
+        title = a["title"]
+        hit = set()
+        for r in con.execute("SELECT lemma FROM article_words WHERE article_id=? AND local=0", (a["id"],)):
+            wid = by_word.get(r["lemma"].lower())
+            if wid:
+                hit.add(wid)
+        try:
+            text = " ".join(b["text"] for b in json.loads(a["body"]) if b.get("t") != "x").lower()
+        except ValueError:
+            text = ""
+        tokens = set(re.findall(r"[a-z]+(?:[-'][a-z]+)*", text))
+        for r in active:
+            if r["id"] in hit:
+                continue
+            for f in _forms(r["word"]):
+                if (" " not in f and f in tokens) or (" " in f and re.search(rf"(?<![a-z]){re.escape(f)}(?![a-z])", text)):
+                    hit.add(r["id"])
+                    break
+        for wid in hit:
+            out[wid].append(title)
+    return out
+
+
 def summaries(con, status: str = "active") -> list[dict]:
     paths = {c["id"]: c["path"] for c in categories(con)}
     cats = defaultdict(list)
@@ -288,6 +328,11 @@ def summaries(con, status: str = "active") -> list[dict]:
         t = e["source_title"].strip()
         if t and t not in sources[e["word_id"]]:
             sources[e["word_id"]].append(t)
+    # 出處文章：在那篇加入的字、在那篇文章裡出現的字（不看有沒有原文例句——原文句子你可能刪掉了）
+    for wid, titles in article_sources(con).items():
+        for t in titles:
+            if t not in sources[wid]:
+                sources[wid].append(t)
     answers = defaultdict(lambda: [0, 0])
     for a in con.execute(
         "SELECT word_id, kind, COUNT(*) n FROM events WHERE kind IN ('answer_ok','answer_ng') GROUP BY word_id, kind"

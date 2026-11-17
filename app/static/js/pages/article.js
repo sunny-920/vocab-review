@@ -860,7 +860,7 @@ export async function render(el) {
           },
         }, '✕')) : null)))
         : h('div', { class: 'muted small lc-empty' }, all.length ? '這個篩選沒有字' : (targets.length || art.words.length ? '這篇沒有你不熟的字。' : '正在找…')),
-      nAdded ? h('button', { class: 'small lc-foot', title: '自由複習，出處選這篇（在這篇加入的字）', onclick: () => { location.hash = '#/free?source=' + encodeURIComponent(art.title); } }, '複習在這篇加的字') : null,
+      nAdded ? h('button', { class: 'small lc-foot', title: '自由複習，出處選這篇（這篇加入的字＋文章裡出現的字）', onclick: () => { location.hash = '#/free?source=' + encodeURIComponent(art.title); } }, '複習這篇的字') : null,
     );
   }
 

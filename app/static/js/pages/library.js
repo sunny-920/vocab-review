@@ -24,7 +24,7 @@ function shiftDay(day, n) {
 }
 
 export async function render(el) {
-  let [rows, cats, status] = await Promise.all([api('/words'), api('/categories'), api('/status')]);
+  let [rows, cats, status, articleList] = await Promise.all([api('/words'), api('/categories'), api('/status'), api('/articles')]);
   const today = status.today;  // 照程式的換日時間算的「今天」
   const state = { q: '', cat: '', lights: new Set(['red', 'yellow', 'green']), sort: 'added_day', dir: -1 };
 
@@ -43,6 +43,17 @@ export async function render(el) {
     return f;
   };
   const addedF = dateFilter('加入日期', [['', '全部'], ['today', '今天'], ['7', '最近 7 天'], ['30', '最近 30 天'], ['custom', '自訂…']], () => draw());
+  // 出處文章：在那篇加入的字＋那篇內文裡出現的字（最近讀的排前面）
+  const opened = new Map(articleList.map(a => [a.title, a.opened_at || a.created_at || '']));
+  const sourceOptions = () => [...new Set(rows.flatMap(r => r.sources))]
+    .sort((a, b) => (opened.get(b) || '').localeCompare(opened.get(a) || '') || a.localeCompare(b));
+  let source = '';
+  const sourceSel = h('select', { onchange: e => { source = e.target.value; draw(); } });
+  const fillSources = () => sourceSel.replaceChildren(h('option', { value: '' }, '全部'),
+    ...sourceOptions().map(t => h('option', { value: t, selected: t === source },
+      `${t.length > 28 ? t.slice(0, 28) + '…' : t}（${rows.filter(r => r.sources.includes(t)).length}）`)));
+  fillSources();
+  const sourceF = h('label', { class: 'date-filter' }, h('span', { class: 'muted small' }, '出處文章'), sourceSel);
   const dueF = dateFilter('下次複習', [['', '全部'], ['due', '今天要複習（含過期）'], ['overdue', '已過期'], ['week', '7 天內'], ['graduated', '已畢業'], ['custom', '自訂…']], () => draw());
   const inRange = (d, a, b) => !!d && (!a || d >= a) && (!b || d <= b);
   function addedOk(r) {
@@ -122,7 +133,7 @@ export async function render(el) {
   function draw() {
     const q = state.q;
     const list = rows.filter(r =>
-      state.lights.has(r.light) && inCategory(r) && addedOk(r) && dueOk(r) &&
+      state.lights.has(r.light) && inCategory(r) && addedOk(r) && dueOk(r) && (!source || r.sources.includes(source)) &&
       (!q || r.word.toLowerCase().includes(q) || (r.zh || '').includes(q)));
     const key = state.sort;
     list.sort((a, b) => {
@@ -154,13 +165,14 @@ export async function render(el) {
 
   async function reload() {
     [rows, cats] = await Promise.all([api('/words'), api('/categories')]);
+    fillSources();
     draw();
   }
 
   el.append(
     h('h1', {}, '單字庫'),
     h('div', { class: 'filters' }, search, catSel, lightFilter),
-    h('div', { class: 'row date-filters' }, addedF.el, dueF.el),
+    h('div', { class: 'row date-filters' }, addedF.el, dueF.el, sourceF),
     h('div', { class: 'row', style: { marginBottom: '8px' } }, countLine, h('span', { class: 'spacer' }), exportBtn),
     h('div', { class: 'table-wrap' }, table),
   );
