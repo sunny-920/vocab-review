@@ -101,6 +101,8 @@ class AIError(Exception):
 
 def _post(path: str, payload: dict, timeout: float) -> dict:
     s = config.load_settings()
+    # 保險：每個請求都要有產生長度上限，不然 AI 陷入無限重複時會一直佔著 GPU，其他請求全部排隊卡住
+    payload.setdefault("options", {}).setdefault("num_predict", 3000)
     req = urllib.request.Request(
         s["ollama_url"].rstrip("/") + path,
         data=json.dumps(payload).encode("utf-8"),
@@ -196,7 +198,7 @@ def generate(ctx: dict) -> dict:
         "stream": False,
         "think": False,
         "keep_alive": "10m",  # 閒置 10 分鐘後卸載，釋放顯示卡記憶體
-        "options": {"temperature": 0.3, "num_ctx": NUM_CTX},
+        "options": {"temperature": 0.3, "num_ctx": NUM_CTX, "num_predict": 2600},  # 一定要有上限：AI 偶爾會無限重複
     }
     try:
         data = _post("/api/chat", payload, timeout=300)
@@ -304,7 +306,7 @@ def judge(word: str, meanings: list[dict], answer: str) -> tuple[bool, str]:
         "stream": False,
         "think": False,
         "keep_alive": "10m",
-        "options": {"temperature": 0, "num_ctx": NUM_CTX},
+        "options": {"temperature": 0, "num_ctx": NUM_CTX, "num_predict": 400},
     }
     data = _post("/api/chat", payload, timeout=120)
     content = re.sub(r"<think>.*?</think>", "", (data.get("message") or {}).get("content", ""), flags=re.S)
@@ -363,7 +365,7 @@ def classify(options: list[str], items: list[dict], allow_new: bool, notes: dict
         "stream": False,
         "think": False,
         "keep_alive": "10m",
-        "options": {"temperature": 0, "num_ctx": NUM_CTX},
+        "options": {"temperature": 0, "num_ctx": NUM_CTX, "num_predict": 2000},
     }
     data = _post("/api/chat", payload, timeout=300)
     content = re.sub(r"<think>.*?</think>", "", (data.get("message") or {}).get("content", ""), flags=re.S)
@@ -704,7 +706,9 @@ def memory(ctx: dict) -> dict:
 
 
 def _chat_json(system: str, user: str, schema: dict, temperature: float = 0, timeout: float = 180,
-               think: bool = False) -> dict:
+               think: bool = False, num_predict: int = 2000) -> dict:
+    """num_predict：最多產生幾個 token。一定要有上限——AI 偶爾會陷入無限重複，
+    沒有上限時會一直佔著 AI（實際發生過：產生了 18,000 多個 token），其他查字、翻譯全部卡住。"""
     payload = {
         "model": config.load_settings()["model"],
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -712,7 +716,7 @@ def _chat_json(system: str, user: str, schema: dict, temperature: float = 0, tim
         "stream": False,
         "think": think,
         "keep_alive": "10m",
-        "options": {"temperature": temperature, "num_ctx": NUM_CTX, **({"num_predict": 3000} if think else {})},
+        "options": {"temperature": temperature, "num_ctx": NUM_CTX, "num_predict": 3000 if think else num_predict},
     }
     data = _post("/api/chat", payload, timeout=timeout)
     content = re.sub(r"<think>.*?</think>", "", (data.get("message") or {}).get("content", ""), flags=re.S).strip()

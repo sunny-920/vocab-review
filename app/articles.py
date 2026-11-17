@@ -246,23 +246,46 @@ def split_long(text: str) -> list[dict]:
     return merged or [{"t": "p", "text": text}]
 
 
+def _batches(n: int, size: int) -> list[tuple[int, int]]:
+    """把 n 行切成每批最多 size 行；最後一批太小（少於 10 行）就併進前一批——
+    只給 AI 一兩行時它常常亂回（實際發生過：101 行的文章，最後一批只有 1 行，整篇排版失敗）。"""
+    out = [(i, min(i + size, n)) for i in range(0, n, size)]
+    if len(out) > 1 and out[-1][1] - out[-1][0] < 10:
+        out[-2] = (out[-2][0], out[-1][1])
+        out.pop()
+    return out
+
+
 def _ai_layout(aid: int, raw: str) -> list[dict]:
     lines = _lines(raw)
     labels = _rule_labels(lines)  # AI 漏掉的行用規則補
     with _jobs_lock:
         _jobs[aid] = {"done": 0, "total": len(lines)}
-    for start in range(0, len(lines), LAYOUT_BATCH):
-        chunk = lines[start:start + LAYOUT_BATCH]
-        got = ai.layout_labels([
-            {"n": start + i + 1, "text": l["text"], "blank_before": l["blank_before"],
-             "prev_end": (lines[start + i - 1]["text"][-40:] if start + i > 0 else "")}
-            for i, l in enumerate(chunk)
-        ])
+    failed = 0
+    for start, end in _batches(len(lines), LAYOUT_BATCH):
+        chunk = lines[start:end]
+        rows = [{"n": start + i + 1, "text": l["text"], "blank_before": l["blank_before"],
+                 "prev_end": (lines[start + i - 1]["text"][-40:] if start + i > 0 else "")}
+                for i, l in enumerate(chunk)]
+        got = {}
+        for attempt in range(2):  # AI 偶爾回傳壞掉的格式：再試一次
+            try:
+                got = ai.layout_labels(rows)
+                break
+            except ai.AIError:
+                if attempt == 1:
+                    failed += 1  # 還是失敗：這一批就用規則排版，不要整篇放棄
         for n, lab in got.items():
-            if start < n <= start + len(chunk) and not _keep_break(lines, n - 1, lab):
+            if start < n <= end and not _keep_break(lines, n - 1, lab):
                 labels[n - 1] = lab
         with _jobs_lock:
-            _jobs[aid]["done"] = min(start + LAYOUT_BATCH, len(lines))
+            _jobs[aid]["done"] = end
+    # 小寫開頭、前面沒空行的行幾乎都是句子的後半，AI 說是新段落也接回上一段（「in her life, she hoped…」）
+    for i in range(1, len(lines)):
+        if labels[i] == "p" and not lines[i]["blank_before"] and lines[i]["text"][:1].islower():
+            labels[i] = "c"
+    if failed and failed == len(_batches(len(lines), LAYOUT_BATCH)):
+        raise ai.AIError("AI 排版失敗（每一批都無法解析），目前用規則排版")
     if labels:
         labels[0] = labels[0] if labels[0] in ("h", "li", "q", "x") else "p"  # 第一行不能是「接上一段」
     labels = _md_labels(lines, labels)
