@@ -1,0 +1,5 @@
+# 文字檔統一用 LF 存；Windows 批次檔一定要 CRLF，不然 cmd 會讀錯
+* text=auto eol=lf
+*.bat text eol=crlf
+*.png binary
+*.ico binary

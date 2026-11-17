@@ -1,0 +1,29 @@
+# ===== 個人資料：絕對不上 git =====
+# 單字庫、複習紀錄、文章、備份、設定、發音快取都在 data\ 裡（每天自動備份到 data\backups）
+data/
+
+# 萬一用 VOCAB_DATA 指到別的資料夾測試，資料庫也不要進來
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ===== 可以重新下載、產生的東西（很大）=====
+# 字典（安裝.bat 會下載）、Wiktionary（tools/build_wiktionary.py 產生，約 10GB）、
+# 語音模型（安裝.bat 會下載，約 340MB）都在 data\ 底下，上面已經排除
+.venv/
+__pycache__/
+*.pyc
+
+# ===== 這台電腦才有用的 =====
+# 捷徑裡寫死了這台電腦的路徑
+*.lnk
+icon-preview.png
+
+# 編輯器、系統
+.vscode/
+.idea/
+.claude/
+Thumbs.db
+desktop.ini
+.DS_Store
