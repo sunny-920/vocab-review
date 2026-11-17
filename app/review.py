@@ -61,6 +61,15 @@ def question(con, wid: int, today: str, sources: set[str] | None = None) -> dict
     pools = _example_pools(w["examples"], sources)
     w["cloze"] = next((c for c in (build_cloze(w["word"], p) for p in pools) if c), [])
     w["hint_example"] = pools[0][0] if pools else None  # 英→中的「例句提示」
+    # 自由複習選了出處文章：那篇文章裡的意思（配對題用；passage 在那篇是「船票、船程」）
+    w["context_meaning"] = ""
+    if sources:
+        q = ",".join("?" * len(sources))
+        r2 = con.execute(
+            f"""SELECT aw.meaning FROM article_words aw JOIN articles a ON a.id=aw.article_id
+                WHERE a.title IN ({q}) AND aw.lemma=? COLLATE NOCASE AND aw.meaning<>'' ORDER BY aw.id DESC LIMIT 1""",
+            (*sources, w["word"])).fetchone()
+        w["context_meaning"] = r2["meaning"] if r2 else ""
     w["prompt_meanings"] = [m for m in w["meanings"] if m["is_primary"]] or w["meanings"][:1]
     w["learning"] = srs.is_learning(r, today)
     return w

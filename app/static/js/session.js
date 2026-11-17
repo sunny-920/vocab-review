@@ -11,12 +11,17 @@ export const MODES = [
   ['mixed', '混合', '以上四種隨機出現（靜音時不出聽寫）'],
 ];
 
-// opts.compact：精簡的選項清單（自由複習右邊那欄用），說明放在滑鼠提示
+// 配對題只在自由複習（一次出一組，不能和一題一題的混在一起；不算進複習紀錄）
+export const MATCH_MODE = ['match', '配對（拖曳）', '把中文拖到對應的英文，一次一組（練習用，不算進複習紀錄）'];
+
+// opts.compact：精簡的選項清單（自由複習右邊那欄用），說明放在滑鼠提示；opts.withMatch：多「配對」
 export function modePicker(opts = {}) {
+  const modes = opts.withMatch ? [...MODES.slice(0, -1), MATCH_MODE, MODES[MODES.length - 1]] : MODES;
   let mode = storageGet('review-mode', 'mixed');
+  if (!modes.some(([k]) => k === mode)) mode = 'mixed';  // 每日複習沒有「配對」
   let shuffle = storageGet('review-shuffle', false);
   if (opts.compact) {
-    const items = MODES.map(([key, label, desc]) => h('label', { class: 'mode-row', title: desc },
+    const items = modes.map(([key, label, desc]) => h('label', { class: 'mode-row', title: desc },
       h('input', { type: 'radio', name: 'mode', checked: key === mode, onchange: () => { mode = key; storageSet('review-mode', key); } }),
       h('span', {}, label)));
     const el = h('div', { class: 'mode-list' }, ...items,
@@ -25,7 +30,7 @@ export function modePicker(opts = {}) {
         '同分類內打亂順序'));
     return { el, get mode() { return mode; }, get shuffle() { return shuffle; } };
   }
-  const cards = MODES.map(([key, label, desc]) => {
+  const cards = modes.map(([key, label, desc]) => {
     const c = h('label', { class: 'mode-card' + (key === mode ? ' on' : '') },
       h('input', { type: 'radio', name: 'mode', checked: key === mode, onchange: () => {
         mode = key; storageSet('review-mode', key);

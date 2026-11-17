@@ -3,6 +3,7 @@
 // 分類、文章再多，畫面也不會變長。
 import { api, h, lightDot, toast } from '../util.js';
 import { modePicker, runSession } from '../session.js';
+import { runMatch } from '../match.js';
 
 const LIGHT_NAMES = { red: '紅燈', yellow: '黃燈', green: '綠燈' };
 const ADDED_PRESETS = [['', '全部'], ['today', '今天'], ['7', '最近 7 天'], ['30', '最近 30 天'], ['custom', '自訂…']];
@@ -383,7 +384,7 @@ export async function render(el) {
     update();
   }
 
-  const picker = modePicker({ compact: true });
+  const picker = modePicker({ compact: true, withMatch: true });
   startBtn.onclick = async () => {
     const ids = selected.map(r => r.id);
     if (picker.mode === 'en2zh' || picker.mode === 'mixed') api('/warmup', { method: 'POST' }).catch(() => {});
@@ -391,6 +392,7 @@ export async function render(el) {
     const queue = all.questions;
     const limit = all.limit;
     detach();
+    if (picker.mode === 'match') { cleanup = runMatch(el, queue); return; }  // 配對：不寫進複習紀錄
     cleanup = runSession(el, {
       session: 'free',
       mode: picker.mode,
