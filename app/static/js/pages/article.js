@@ -28,6 +28,9 @@ function sentences(text) {
   return out;
 }
 
+// 右欄標題的字太長就縮小字體（underestimate、characteristically…）
+const wordSize = w => (w.length > 18 ? ' xlong' : w.length > 11 ? ' long' : '');
+
 const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const SIZES = [['小', 16], ['中', 18], ['大', 21]];
 const WORD_LIMIT = 6;  // 選 6 個字以內查字；更長的當成句子（翻譯、存成片語）
@@ -492,10 +495,9 @@ export async function render(el) {
     let res = null;
 
     const head = h('div', { class: 'side-head' },
-      h('span', { class: 'side-word' }, q.selected),
+      h('span', { class: 'side-word' + wordSize(q.selected) }, q.selected),
       h('button', { class: 'speak', title: '發音', onclick: () => speak(q.lemma) }, '🔊'),
-      copyButton(q.lemma),
-      h('span', { class: 'spacer' }), backBtn());
+      copyButton(q.lemma));
     const lemmaLine = q.lemma.toLowerCase() !== q.selected.toLowerCase()
       ? h('div', { class: 'small' }, '原形 ', h('strong', {}, q.lemma), q.forms.length ? `（這裡是${q.forms.join('、')}）` : '') : null;
     const dictBox = q.dict
@@ -540,7 +542,7 @@ export async function render(el) {
     };
     drawActions();
 
-    side.replaceChildren(head, lemmaLine || '',
+    side.replaceChildren(h('div', { class: 'row side-top' }, backBtn()), head, lemmaLine || '',
       h('div', { class: 'sec-label row' }, '在這句裡', h('span', { class: 'spacer' }), tr.btn), sentBox, tr.box, aiBox,
       h('div', { class: 'sec-label' }, '字典'), dictBox, actions);
 
@@ -729,7 +731,7 @@ export async function render(el) {
       h('div', { class: 'row' }, backBtn(), h('span', { class: 'spacer' }),
         h('button', { class: 'small', onclick: () => phraseForm(p) }, '✎ 修改'),
         h('button', { class: 'small ghost danger-text', onclick: () => deletePhrase(p) }, '刪除')),
-      h('div', { class: 'side-word', style: { marginTop: '6px' } }, p.text),
+      h('div', { class: 'side-word' + wordSize(p.text), style: { marginTop: '6px' } }, p.text),
       p.zh ? h('div', { class: 'side-meaning', style: { marginTop: '4px' } }, p.zh) : null,
       p.note ? h('div', { class: 'phrase-note' }, p.note) : (p.zh ? null : h('div', { class: 'muted small' }, '（沒有中文和說明）')),
       p.sentence ? h('div', { class: 'side-sentence', style: { marginTop: '10px' } }, p.sentence) : null,
@@ -814,7 +816,7 @@ export async function render(el) {
     side.replaceChildren(
       h('div', { class: 'row' }, backBtn(), h('span', { class: 'spacer' }), h('span', { class: 'badge local-badge' }, '只記在這篇')),
       h('div', { class: 'side-head', style: { marginTop: '6px' } },
-        h('span', { class: 'side-word' }, x.lemma),
+        h('span', { class: 'side-word' + wordSize(x.lemma) }, x.lemma),
         h('button', { class: 'speak', title: '發音', onclick: () => speak(x.lemma) }, '🔊'),
         copyButton(x.lemma)),
       h('label', { class: 'field', style: { marginTop: '8px' } }, h('span', {}, '中文'), zh),
