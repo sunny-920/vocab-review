@@ -5,7 +5,7 @@ import threading
 import urllib.error
 import urllib.request
 
-from . import config
+from . import taxonomy, config
 from .dictionary import to_tw
 
 SCHEMA = {
@@ -62,8 +62,10 @@ SYSTEM_PROMPT = """你是幫台灣使用者整理英文單字卡的助手。使�
      意思本身就是一般用法時（algorithm 的「演算法」、service 的「服務」、approach 的「方法」）填空字串。不要因為原文句子在講某個領域，就把每個意思都標上那個領域。
    - primary：最常用、最需要記住的 1～2 個意思設為 true。有提供原文句子時，句子裡用到的那個意思一定要 primary=true 並排在第一個。
    - 有「使用者提供的中文」時，必須包含這個意思並設為 primary=true。
-3. primary_category：從「可用分類」清單挑一個最適合的，原樣照抄（格式「大類/小類」）。有原文句子時以句子的領域為準。只有清單裡完全沒有合適的，才自己寫一個新的「大類/小類」。
-   other_categories：其他也適合的分類，最多 2 個，沒有就給空陣列。
+3. primary_category：從「可用分類」清單挑一個最適合的，原樣照抄（格式「大類/小類」）。只有清單裡完全沒有合適的，才自己寫一個新的「大類/小類」。
+   依「這個字本身最常見的意思」分類，**不要看原文句子、文章在講什麼領域**：在資料庫文章裡讀到 relevant、available，
+   它們還是一般的字（放「通用」或「學術寫作常用字」），不是資料庫的字。只有字本身就是專有名詞（table 的資料表、algorithm）才放科技類。
+   other_categories：只有「另一個常見的意思屬於別的分類」才填 1 個（table：資料表→科技、桌子→日常生活），否則給空陣列。
    有些分類後面附了「說明」，請照說明判斷：符合說明的字才放進去，說明寫「不包含」的就不要放。
 4. examples：1～2 個自然、簡單的例句，必須用到這個單字（可以是變化形），附繁體中文翻譯。專業領域的字請用該領域的情境造句。不要重複使用者的原文句子。
 5. supplement（補充）：只寫「容易混淆的字」，幫學生分清楚。有兩種：
@@ -78,13 +80,13 @@ SYSTEM_PROMPT = """你是幫台灣使用者整理英文單字卡的助手。使�
 8. context_zh：把每一句「原文句子」翻成自然的繁體中文，順序相同。沒有原文句子就給空陣列。
 
 範例一（單字 increasingly，沒有原文句子）：
-{"kk":"ɪnˋkrisɪŋlɪ","meanings":[{"pos":"adv.","zh":"越來越、日益","domain":"","primary":true}],"primary_category":"通用/描述","other_categories":[],"examples":[{"en":"Machine learning is increasingly used in healthcare.","zh":"機器學習越來越常被用在醫療領域。"}],"supplement":"","context_zh":[],"related":[{"word":"increase","note":"增加（原形動詞）"}]}
+{"kk":"ɪnˋkrisɪŋlɪ","meanings":[{"pos":"adv.","zh":"越來越、日益","domain":"","primary":true}],"primary_category":"通用/副詞、片語與連接詞","other_categories":[],"examples":[{"en":"Machine learning is increasingly used in healthcare.","zh":"機器學習越來越常被用在醫療領域。"}],"supplement":"","context_zh":[],"related":[{"word":"increase","note":"增加（原形動詞）"}]}
 
 範例二（單字 retrieve，原文句子：The API retrieves user records from the database.）：
-{"kk":"rɪˋtriv","meanings":[{"pos":"v.","zh":"檢索、讀取","domain":"資料庫","primary":true},{"pos":"v.","zh":"取回、找回","domain":"","primary":true},{"pos":"v.","zh":"挽回、恢復","domain":"","primary":false}],"primary_category":"科技/資料庫","other_categories":["通用/動作"],"examples":[{"en":"You can retrieve deleted files from the backup.","zh":"你可以從備份中找回被刪除的檔案。"}],"supplement":"retrieve（取回） vs receive（收到）：retrieve 是主動拿回來，receive 是別人給你","context_zh":["這個 API 會從資料庫讀取使用者紀錄。"],"related":[{"word":"retrieval","note":"檢索（名詞）"},{"word":"store","note":"儲存（相反的動作）"}]}
+{"kk":"rɪˋtriv","meanings":[{"pos":"v.","zh":"檢索、讀取","domain":"資料庫","primary":true},{"pos":"v.","zh":"取回、找回","domain":"","primary":true},{"pos":"v.","zh":"挽回、恢復","domain":"","primary":false}],"primary_category":"科技/資料與資料庫","other_categories":["通用/動作與變化"],"examples":[{"en":"You can retrieve deleted files from the backup.","zh":"你可以從備份中找回被刪除的檔案。"}],"supplement":"retrieve（取回） vs receive（收到）：retrieve 是主動拿回來，receive 是別人給你","context_zh":["這個 API 會從資料庫讀取使用者紀錄。"],"related":[{"word":"retrieval","note":"檢索（名詞）"},{"word":"store","note":"儲存（相反的動作）"}]}
 
 範例三（單字 examine，沒有原文句子）：
-{"kk":"ɪgˋzæmɪn","meanings":[{"pos":"v.","zh":"檢查、審查","domain":"","primary":true},{"pos":"v.","zh":"測驗、考問","domain":"","primary":false}],"primary_category":"通用/動作","other_categories":[],"examples":[{"en":"The doctor will examine your eyes.","zh":"醫生會檢查你的眼睛。"}],"supplement":"","context_zh":[],"related":[{"word":"exam","note":"考試（相關字）"},{"word":"examination","note":"檢查、考試（名詞）"}]}
+{"kk":"ɪgˋzæmɪn","meanings":[{"pos":"v.","zh":"檢查、審查","domain":"","primary":true},{"pos":"v.","zh":"測驗、考問","domain":"","primary":false}],"primary_category":"通用/動作與變化","other_categories":[],"examples":[{"en":"The doctor will examine your eyes.","zh":"醫生會檢查你的眼睛。"}],"supplement":"","context_zh":[],"related":[{"word":"exam","note":"考試（相關字）"},{"word":"examination","note":"檢查、考試（名詞）"}]}
 """
 
 # 一般生成約 1,700 token；記憶法開「思考」最多再多 3,000。預熱和生成必須一致，否則會重新載入模型
@@ -448,7 +450,8 @@ def normalize(raw: dict, ctx: dict) -> dict:
         meanings.append({
             "pos": str(m.get("pos") or "").strip(),
             "zh": zh,
-            "domain": _norm_path(m.get("domain")).split("/")[-1],  # 「科技/資料庫」→「資料庫」
+            # 「科技/資料庫」→「資料庫」；AI 有時把分類名稱當領域寫（「資料與資料庫」），換回領域名稱
+            "domain": taxonomy.DOMAIN_ALIASES.get(d := _norm_path(m.get("domain")).split("/")[-1], d),
             "is_primary": bool(m.get("primary")),
             "source": "ai",
         })
@@ -490,6 +493,8 @@ def normalize(raw: dict, ctx: dict) -> dict:
         p = _norm_path(p)
         if p in paths and p != primary and p not in others:
             others.append(p)
+    # 程式檢查：沒有技術意思的字不能放科技類（AI 常因為文章主題亂放）；其他分類最多 1 個
+    primary, others = taxonomy.check(ctx["word"], meanings, primary, others, list(paths))
 
     examples = []
     for e in raw.get("examples") or []:

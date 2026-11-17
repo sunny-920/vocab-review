@@ -41,10 +41,26 @@ def build_cloze(word: str, examples: list[dict]) -> list[dict]:
     return out
 
 
-def question(con, wid: int, today: str) -> dict:
+def _example_pools(examples: list[dict], sources: set[str] | None) -> list[list[dict]]:
+    """題目用哪些例句（依序找，第一組能用的就用）：
+    1. 自由複習有選「出處文章」→ 那幾篇的原文句子
+    2. AI 例句（一般複習都用這個；原文句子常常很長或在講別的事，當題目會干擾）
+    3. 都沒有 AI 例句時，才用其他原文句子"""
+    ctx = [e for e in examples if e["source"] == "context"]
+    pools = []
+    if sources:
+        pools.append([e for e in ctx if e.get("source_title") in sources])
+    pools.append([e for e in examples if e["source"] != "context"])
+    pools.append(ctx)
+    return [p for p in pools if p]
+
+
+def question(con, wid: int, today: str, sources: set[str] | None = None) -> dict:
     w = words.load(con, wid, with_dict=True)
     r = con.execute("SELECT added_day, relearn_day FROM words WHERE id=?", (wid,)).fetchone()
-    w["cloze"] = build_cloze(w["word"], w["examples"])
+    pools = _example_pools(w["examples"], sources)
+    w["cloze"] = next((c for c in (build_cloze(w["word"], p) for p in pools) if c), [])
+    w["hint_example"] = pools[0][0] if pools else None  # 英→中的「例句提示」
     w["prompt_meanings"] = [m for m in w["meanings"] if m["is_primary"]] or w["meanings"][:1]
     w["learning"] = srs.is_learning(r, today)
     return w
@@ -117,7 +133,7 @@ def daily_round(con, shuffle: bool) -> dict:
     }
 
 
-def free_list(con, ids: list[int], shuffle: bool) -> dict:
+def free_list(con, ids: list[int], shuffle: bool, sources: list[str] | None = None) -> dict:
     today = srs.today_str()
     active = {
         r["id"] for r in con.execute(
@@ -125,7 +141,7 @@ def free_list(con, ids: list[int], shuffle: bool) -> dict:
     } if ids else set()
     ordered = _ordered(con, [i for i in ids if i in active], shuffle)
     return {
-        "questions": [question(con, i, today) for i in ordered],
+        "questions": [question(con, i, today, set(sources or []) or None) for i in ordered],
         "limit": int(config.load_settings()["daily_limit"]),
     }
 

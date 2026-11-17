@@ -119,6 +119,7 @@ class Override(BaseModel):
 class FreeReview(BaseModel):
     ids: list[int]
     shuffle: bool = False
+    sources: list[str] = []  # 有選「出處文章」時，例句用那幾篇的原文
 
 
 class Progress(BaseModel):
@@ -358,7 +359,7 @@ def review_daily(shuffle: bool = False):
 @app.post("/api/review/free")
 def review_free(f: FreeReview):
     with db.tx() as con:
-        return review.free_list(con, f.ids, f.shuffle)
+        return review.free_list(con, f.ids, f.shuffle, f.sources)
 
 
 @app.post("/api/review/answer")

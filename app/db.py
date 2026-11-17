@@ -169,13 +169,7 @@ CREATE INDEX IF NOT EXISTS idx_words_status ON words(status);
 CREATE INDEX IF NOT EXISTS idx_events_word ON events(word_id);
 """
 
-DEFAULT_CATEGORIES = [
-    ("科技", ["資料庫", "機器學習", "程式設計", "網路", "資安", "硬體", "雲端"]),
-    ("商業", ["經濟", "金融", "管理", "行銷"]),
-    ("學術", ["研究方法", "數學統計"]),
-    ("生活", ["旅遊", "飲食", "健康", "情緒"]),
-    ("通用", ["動作", "描述", "抽象概念"]),
-]
+# 新的資料庫用的預設分類（和說明）在 taxonomy.py：依字本身的意思分類，不看在哪篇文章讀到
 
 
 def connect() -> sqlite3.Connection:
@@ -216,13 +210,14 @@ def init() -> None:
         if row is not None and int(row["value"]) < SCHEMA_VERSION:
             con.execute("UPDATE meta SET value=? WHERE key='schema_version'", (str(SCHEMA_VERSION),))
         if row is None:
-            for i, (top, children) in enumerate(DEFAULT_CATEGORIES):
+            from .taxonomy import TREE
+            for i, (top, children) in enumerate(TREE):
                 tid = con.execute(
                     "INSERT INTO categories(parent_id,name,sort) VALUES (NULL,?,?)", (top, i)
                 ).lastrowid
-                for j, child in enumerate(children):
+                for j, (child, note) in enumerate(children):
                     con.execute(
-                        "INSERT INTO categories(parent_id,name,sort) VALUES (?,?,?)", (tid, child, j)
+                        "INSERT INTO categories(parent_id,name,sort,description) VALUES (?,?,?,?)", (tid, child, j, note)
                     )
             con.execute(
                 "INSERT INTO meta(key,value) VALUES ('schema_version',?)", (str(SCHEMA_VERSION),)

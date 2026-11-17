@@ -387,7 +387,7 @@ export async function render(el) {
   startBtn.onclick = async () => {
     const ids = selected.map(r => r.id);
     if (picker.mode === 'en2zh' || picker.mode === 'mixed') api('/warmup', { method: 'POST' }).catch(() => {});
-    const all = await api('/review/free', { method: 'POST', body: { ids, shuffle: picker.shuffle } });
+    const all = await api('/review/free', { method: 'POST', body: { ids, shuffle: picker.shuffle, sources: [...f.sources] } });
     const queue = all.questions;
     const limit = all.limit;
     detach();

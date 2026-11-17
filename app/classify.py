@@ -7,7 +7,7 @@ import threading
 import traceback
 import uuid
 
-from . import ai, db, words
+from . import ai, db, taxonomy, words
 
 BATCH = 20  # 一次問 AI 幾個字
 
@@ -66,6 +66,11 @@ def _run(job: dict, options: list[str], cands: list[dict], uid: int, notes: dict
                 path = result.get(r["word"].lower())
                 if not path:
                     continue
+                if taxonomy.is_tech_path(path):  # 沒有技術意思的字不放科技類（和新增單字同一條規則）
+                    with db.tx() as con:
+                        ms = [dict(m) for m in con.execute("SELECT pos, zh, domain FROM meanings WHERE word_id=?", (r["id"],))]
+                    if not taxonomy.has_tech_meaning(r["word"], ms):
+                        continue
                 found.append({
                     "word_id": r["id"], "word": r["word"], "zh": r["zh"],
                     "current": r["category"], "path": path,

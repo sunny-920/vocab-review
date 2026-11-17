@@ -123,8 +123,8 @@ export function runSession(el, opts) {
   function prompt(item) {
     const q = item.q;
     if (item.mode === 'en2zh') {
-      // 例句提示：按了才顯示，只給英文（中文翻譯會洩漏答案）；優先用你讀到的原文句子
-      const ex = q.examples.find(e => e.source === 'context') || q.examples[0];
+      // 例句提示：按了才顯示，只給英文（中文翻譯會洩漏答案）
+      const ex = q.hint_example;  // 一般用 AI 例句；自由複習選了文章時用那篇的原文（後端決定）
       const hintBox = h('div', { class: 'hint-sentence hidden' });
       const hintBtn = ex ? h('button', {
         class: 'small ghost hint-btn', type: 'button', onclick: () => {
