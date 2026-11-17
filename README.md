@@ -24,7 +24,9 @@
 ## 安裝與啟動
 
 1. 雙擊 `安裝.bat`：建立 `.venv`、安裝套件、下載離線字典（ECDICT）和語音模型（Kokoro）
-2. 雙擊 `啟動.bat`：會自動開瀏覽器，網址 `http://127.0.0.1:8765`
+2. 雙擊 `啟動.bat`：瀏覽器會自動打開 `http://127.0.0.1:8765`
+
+   8765 被其他程式佔用時，可以用環境變數 `VOCAB_PORT` 換成別的 port，例如在 `啟動.bat` 的 `set PYTHONUTF8=1` 下面加一行 `set VOCAB_PORT=8770`。
 
 選用：建立 Wiktionary 字源資料庫（字根拆解更準）。到 [kaikki.org](https://kaikki.org/dictionary/rawdata.html) 下載 `raw-wiktextract-data.jsonl.gz`，再執行：
 
@@ -47,7 +49,7 @@
 ## 用手機連回來
 
 程式只聽本機（`127.0.0.1`），**沒有登入功能，不要直接開放到網路上**。
-要在手機或其他電腦用，建議裝 [Tailscale](https://tailscale.com/)，在跑程式的電腦執行 `tailscale serve --bg 8765`，
+要在手機或其他電腦用，建議裝 [Tailscale](https://tailscale.com/)，在跑程式的電腦執行 `tailscale serve --bg 8765`（有改 port 的話換成你的 port），
 只有登入同一個 Tailscale 帳號的裝置連得到。
 
 ## 使用的資料與模型
